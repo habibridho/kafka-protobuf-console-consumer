@@ -9,22 +9,23 @@ import (
 	"gopkg.in/alecthomas/kingpin.v2"
 	"log"
 	"os"
+	"strings"
 	"time"
 )
 
 var (
 	version                  = kingpin.Flag("version", "Version").Short('v').Bool()
 	debug                    = kingpin.Flag("debug", "Enable Sarama logs").Short('d').Bool()
-	brokerList               = kingpin.Flag("broker-list", "List of brokers to connect").Short('b').Default("localhost:9092").Strings()
+	brokerListRaw            = kingpin.Flag("broker-list", "List of brokers to connect").Short('b').Default("localhost:9092").String()
 	consumerGroupName        = kingpin.Flag("consumer-group", "Consumer group to use").Short('c').String()
 	topic                    = kingpin.Flag("topic", "Topic name").Short('t').String()
 	protoImportDirs          = kingpin.Flag("proto-dir", "/foo/dir1 /bar/dir2 (add all dirs used by imports)").Strings()
 	protoFileNameWithMessage = kingpin.Flag("file", "will be baz/a.proto that's in /foo/dir1/baz/a.proto").String()
 	messageName              = kingpin.Flag("message", "Proto message name").String()
 
-	fromBeginning 			 = kingpin.Flag("from-beginning", "Read from beginning").Bool()
-	prettyJson    			 = kingpin.Flag("pretty", "Format output").Bool()
-	withSeparator 			 = kingpin.Flag("with-separator", "Adds separator between messages. Useful with --pretty").Bool()
+	fromBeginning = kingpin.Flag("from-beginning", "Read from beginning").Bool()
+	prettyJson    = kingpin.Flag("pretty", "Format output").Bool()
+	withSeparator = kingpin.Flag("with-separator", "Adds separator between messages. Useful with --pretty").Bool()
 
 	// make will provide the version details for the release executable
 	versionInfo string
@@ -39,7 +40,10 @@ func main() {
 		os.Exit(0)
 	}
 
-	if len(*brokerList) == 0 || len(*topic) == 0 || len(*protoFileNameWithMessage) == 0 ||
+	brokerList := strings.Split(*brokerListRaw, ",")
+	fmt.Printf("brokers: %v\n", brokerList)
+
+	if len(brokerList) == 0 || len(*topic) == 0 || len(*protoFileNameWithMessage) == 0 ||
 		len(*messageName) == 0 {
 		// TODO fix --help should work when Flags are marked Required, currently its supported by making Flags optional and checking this way
 		fmt.Println("Missing required params; try --help")
@@ -59,7 +63,7 @@ func main() {
 	}
 
 	// Start with a client
-	client, err := NewClient(*brokerList, config)
+	client, err := NewClient(brokerList, config)
 	if err != nil {
 		panic(err)
 	}
@@ -88,7 +92,7 @@ func main() {
 		}
 
 		handler := consumer.NewSimpleConsumerGroupHandler(
-			protobufJSONStringify, *prettyJson, *fromBeginning, *withSeparator, )
+			protobufJSONStringify, *prettyJson, *fromBeginning, *withSeparator)
 
 		err = group.Consume(ctx, topics, handler)
 		if err != nil {
